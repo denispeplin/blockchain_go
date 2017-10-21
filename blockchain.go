@@ -14,6 +14,11 @@ type Blockchain struct {
 	db  *bolt.DB
 }
 
+type BlockchainIterator struct {
+	currentHash []byte
+	db          *bolt.DB
+}
+
 func (bc *Blockchain) AddBlock(data string) {
 	newBlock := NewBlock(data, bc.tip)
 
@@ -28,6 +33,29 @@ func (bc *Blockchain) AddBlock(data string) {
 		return nil
 	})
 	RaiseError(err)
+}
+
+func (bc *Blockchain) Iterator() *BlockchainIterator {
+	bci := BlockchainIterator{currentHash: bc.tip, db: bc.db}
+
+	return &bci
+}
+
+func (i *BlockchainIterator) Next() *Block {
+	var block *Block
+
+	err := i.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(blocksBucket))
+		encodedBlock := bucket.Get(i.currentHash)
+		block = DeserializeBlock(encodedBlock)
+
+		return nil
+	})
+	RaiseError(err)
+
+	i.currentHash = block.PrevBlockHash
+
+	return block
 }
 
 // NewBlockchain creates a new Blockchain with genesis Block
